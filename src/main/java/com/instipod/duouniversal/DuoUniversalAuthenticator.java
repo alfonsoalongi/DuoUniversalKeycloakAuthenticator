@@ -1,23 +1,29 @@
 package com.instipod.duouniversal;
 
-import com.duosecurity.Client;
-import com.duosecurity.exception.DuoException;
-import com.duosecurity.model.Token;
+import java.net.URI;
+import java.text.MessageFormat;
+import java.util.Map;
+
+import javax.ws.rs.core.MultivaluedMap;
+import javax.ws.rs.core.Response;
+
 import org.jboss.logging.Logger;
 import org.keycloak.authentication.AuthenticationFlowContext;
 import org.keycloak.authentication.AuthenticationFlowError;
+import org.keycloak.authentication.AuthenticationFlowException;
 import org.keycloak.authentication.Authenticator;
 import org.keycloak.forms.login.LoginFormsProvider;
 import org.keycloak.models.AuthenticatorConfigModel;
 import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.RealmModel;
+import org.keycloak.models.RoleModel;
 import org.keycloak.models.UserModel;
 import org.keycloak.models.utils.FormMessage;
+import org.keycloak.models.utils.KeycloakModelUtils;
 
-import javax.ws.rs.core.MultivaluedMap;
-import javax.ws.rs.core.Response;
-import java.net.URI;
-import java.util.Map;
+import com.duosecurity.Client;
+import com.duosecurity.exception.DuoException;
+import com.duosecurity.model.Token;
 
 public class DuoUniversalAuthenticator implements Authenticator {
     public static final DuoUniversalAuthenticator SINGLETON = new DuoUniversalAuthenticator();
@@ -134,14 +140,60 @@ public class DuoUniversalAuthenticator implements Authenticator {
             return;
         }
 
+        RealmModel realm = authenticationFlowContext.getRealm();
         UserModel user = authenticationFlowContext.getUser();
         if (user == null) {
             //no username
             logger.error("Received a flow request with no user!  Returning internal error.");
-            authenticationFlowContext.failure(AuthenticationFlowError.INTERNAL_ERROR);
+            authenticationFlowContext.failure(AuthenticationFlowError.GENERIC_AUTHENTICATION_ERROR);
             return;
         }
         String username = user.getUsername();
+             
+        // Determine if DUO Authenticator will be applied only to specific roles
+        boolean applyDuoAuth = true;
+        String roles = authConfig.getConfig().get(DuoUniversalAuthenticatorFactory.DUO_CONDITIONAL_ROLES);
+        if (roles != null && !roles.equalsIgnoreCase("")) {
+        	applyDuoAuth = false;
+            //multivalue string seperator is ##
+            String[] rolesSplit = roles.split("##");
+            for (String roleName : rolesSplit) {
+            	RoleModel role = KeycloakModelUtils.getRoleFromString(realm, roleName);
+                if (role == null) {
+                    logger.errorv("Invalid role name found: \"{0}\"", roleName);
+                    throw new AuthenticationFlowException(MessageFormat.format("Invalid role name found: \"{0}\"", roleName), AuthenticationFlowError.INTERNAL_ERROR);
+                }
+            	if (user.hasRole(role)) {
+            		applyDuoAuth = true;
+            		break;
+            	}
+            }
+        }
+		else {
+			// Determine if DUO Authenticator will be NOT applied if a specific role was
+			// found
+			roles = authConfig.getConfig().get(DuoUniversalAuthenticatorFactory.DUO_SKIP_CONDITIONAL_ROLES);
+			if (roles != null && !roles.equalsIgnoreCase("")) {
+				// multivalue string seperator is ##
+				String[] rolesSplit = roles.split("##");
+				for (String roleName : rolesSplit) {
+					RoleModel role = KeycloakModelUtils.getRoleFromString(realm, roleName);
+					if (role == null) {
+						logger.errorv("Invalid role name found: \"{0}\"", roleName);
+	                    throw new AuthenticationFlowException(MessageFormat.format("Invalid role name found: \"{0}\"", roleName), AuthenticationFlowError.INTERNAL_ERROR);
+					}
+					if (user.hasRole(role)) {
+						applyDuoAuth = false;
+						break;
+					}
+				}
+			}
+		}
+
+        if (!applyDuoAuth) {
+            authenticationFlowContext.success();
+            return;
+        }
 
         //determine the user desire
         //if a duo state is set, assume it is the second request

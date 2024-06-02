@@ -19,6 +19,8 @@ public class DuoUniversalAuthenticatorFactory implements org.keycloak.authentica
     protected static final String DUO_SECRET_KEY = "duoSecretKey";
     protected static final String DUO_FAIL_SAFE = "duoFailSafe";
     protected static final String DUO_CUSTOM_CLIENT_IDS = "duoClientIds";
+    protected static final String DUO_CONDITIONAL_ROLES = "duoCondUserRole";
+    protected static final String DUO_SKIP_CONDITIONAL_ROLES = "duoSkipCondUserRole";
 
     private final static List<ProviderConfigProperty> commonConfig;
 
@@ -29,6 +31,8 @@ public class DuoUniversalAuthenticatorFactory implements org.keycloak.authentica
                 .property().name(DUO_SECRET_KEY).label("Duo Secret Key").helpText("Obtained from admin console").type(ProviderConfigProperty.STRING_TYPE).add()
                 .property().name(DUO_FAIL_SAFE).label("Fail Safe").helpText("With this enabled, users will be able to login if Duo is not reachable").type(ProviderConfigProperty.BOOLEAN_TYPE).add()
                 .property().name(DUO_CUSTOM_CLIENT_IDS).label("Client Overrides").helpText("Comma separated list of client-specific Duo key overrides (keycloak client id, duo client id, duo secret, (optional) API hostname)").type(ProviderConfigProperty.MULTIVALUED_STRING_TYPE).add()
+                .property().name(DUO_CONDITIONAL_ROLES).label("Apply to user roles").helpText("If set, the DUO authentication will be applied to users who have at least one of these roles. This option has precedence on the 'Skip for user roles' option. Click 'Select Role' button to browse roles, or just type it in the textbox. To reference a client role the syntax is clientname.clientrole, i.e. myclient.myrole").type(ProviderConfigProperty.MULTIVALUED_STRING_TYPE).add()
+                .property().name(DUO_SKIP_CONDITIONAL_ROLES).label("Skip for user roles").helpText("If set, the DUO authentication will NOT be applied to users who have at least one of these roles. Click 'Select Role' button to browse roles, or just type it in the textbox. To reference a client role the syntax is clientname.clientrole, i.e. myclient.myrole").type(ProviderConfigProperty.MULTIVALUED_STRING_TYPE).add()
                 .build()
         );
     }
